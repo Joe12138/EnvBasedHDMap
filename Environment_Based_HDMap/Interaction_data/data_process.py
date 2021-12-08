@@ -2,6 +2,7 @@ import csv
 from Interaction_data.vehicle_state import VehicleState
 from Interaction_data.snap_shot import SnapShot
 from Interaction_data.trajectory import Trajectory
+import numpy as np
 
 
 class InteractionDataset(object):
@@ -42,10 +43,10 @@ class InteractionDataset(object):
                         break
 
                     x = float(row[5])
-                    y = float(row[6])
+                    y = 1000-float(row[6])
                     vx = float(row[7])
                     vy = float(row[8])
-                    psi_rad = float(row[9])
+                    psi_rad = -float(row[9])
                     length = float(row[10])
                     width = float(row[11])
 

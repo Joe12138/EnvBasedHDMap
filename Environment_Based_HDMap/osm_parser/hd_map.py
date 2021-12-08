@@ -9,9 +9,12 @@ from scipy import interpolate
 
 
 class HDMap(object):
-    def __init__(self, osm_file_path: str, lat_origin: float = 0.0, lon_origin: float = 0.0):
+    def __init__(self, osm_file_path: str, lat_origin: float = 0.0, lon_origin: float = 0.0,
+                 name: str = "DR_CHN_Merging_ZS0"):
         self.projector = lanelet2.projection.UtmProjector(lanelet2.io.Origin(lat_origin, lon_origin))
         self.lanelet_map = lanelet2.io.load(osm_file_path, self.projector)
+
+        self.scene_name = name
 
         # self.id_node_dict: dict: key=node id, value=Node object
         self.id_node_dict = self.get_node()
@@ -30,6 +33,23 @@ class HDMap(object):
         self.complete_lane_dict = self.get_complete_lane()
 
         self.draw_lane_dict = self.complete_lane_to_draw_lane()
+        self.fix_draw_lane()
+
+    def fix_draw_lane(self):
+        for _, draw_lane_obj in self.draw_lane_dict.items():
+            for index in range(len(draw_lane_obj.index_coord_dict)-1):
+                for way in range(2):
+                    for x in range(2):
+                        print(draw_lane_obj.index_coord_dict[index][way][1][x])
+                        if abs(draw_lane_obj.index_coord_dict[index][way][1][x]-draw_lane_obj.index_coord_dict[index+1][way][0][x]) <= 0.0001:
+                            continue
+                        else:
+                            temp_value = draw_lane_obj.index_coord_dict[index+1][way][0][x]
+                            if x == 0:
+                                draw_lane_obj.index_coord_dict[index][way][1] = (temp_value, draw_lane_obj.index_coord_dict[index][way][1][1])
+                            else:
+                                draw_lane_obj.index_coord_dict[index][way][1] = (draw_lane_obj.index_coord_dict[index][way][1][0], temp_value)
+
 
     def get_node(self) -> dict:
         """
@@ -38,7 +58,7 @@ class HDMap(object):
         node_coord_dict = {}
 
         for p in self.lanelet_map.pointLayer:
-            node = Node(n_id=int(p.id), x=float(p.x), y=float(p.y))
+            node = Node(n_id=int(p.id), x=float(p.x), y=1000-float(p.y))
             node_coord_dict[int(p.id)] = node
 
         return node_coord_dict
@@ -49,10 +69,13 @@ class HDMap(object):
         """
         way_dict = {}
 
+        way_type_set = set()
+
         for ls in self.lanelet_map.lineStringLayer:
             ref_node_list = []
 
             way_type = ls.attributes["type"]
+            way_type_set.add(way_type)
             way_subtype = None
 
             if way_type == "line_thin" or way_type == "line_thick":
@@ -65,6 +88,8 @@ class HDMap(object):
 
             way = Way(w_id=int(ls.id), way_type=way_type, subtype=way_subtype, ref_node_list=ref_node_list)
             way_dict[int(ls.id)] = way
+
+        print(way_type_set)
 
         return way_dict
 
@@ -486,10 +511,6 @@ class HDMap(object):
             for index in range(len(complete_lane_obj.lane_list)):
                 single_lane_id = complete_lane_obj.lane_list[index]
                 left_way_list, right_way_list = self.linear_interpolation_for_lane(single_lane_id)
-                # print(left_way_list)
-                # left_way_list, right_way_list = self.linear_interpolation_for_lane_with_small_interval(single_lane_id, interval=1)
-                # print(left_way_list)
-                # print("**************************************")
 
                 if complete_lane_obj.left_way_list[index] == self.id_lane_dict[single_lane_id].left_way_id:
                     left_way_type = "solid" if complete_lane_obj.left_way_type_list[index] == "solid" else "dashed"
@@ -594,7 +615,12 @@ class HDMap(object):
             return False
 
     def draw_with_original_data_by_matplotlib(self):
+        color_list = ["gray", "red", "yellow", "green", "purple", "black", "blue", "orange", "pink", "skyblue", "brown"]
         for draw_lane_id, draw_lane_obj in self.draw_lane_dict.items():
+            left_way_list_x = []
+            left_way_list_y = []
+            right_way_list_x = []
+            right_way_list_y = []
             for index, coord in draw_lane_obj.index_coord_dict.items():
                 way_type = draw_lane_obj.index_type_dict[index]
                 left_way_type = "-" if way_type[0] == "solid" else "--"
@@ -609,8 +635,28 @@ class HDMap(object):
                          [coord[1][0][1], coord[1][1][1]],
                          color=right_color,
                          linestyle=right_way_type)
+                x = [coord[0][0][0], coord[0][1][0], coord[1][1][0], coord[1][0][0]]
+                y = [coord[0][0][1], coord[0][1][1], coord[1][1][1], coord[1][0][1]]
+                plt.fill(x, y, color="gray")
+                left_way_list_x.append(x[0:2])
+                left_way_list_y.append(y[0:2])
 
-        plt.savefig("/home/joe/Desktop/DR_CHN_Merging_ZS0_small.pdf")
+                a = copy.deepcopy(x[2:])
+                b = copy.deepcopy(y[2:])
+                a.reverse()
+                b.reverse()
+                right_way_list_x.append(a)
+                right_way_list_y.append(b)
+
+            # print(left_way_list_x)
+            # print(left_way_list_y)
+            # print()
+            # print(right_way_list_x)
+            # print(right_way_list_y)
+
+            # print("**************************************************")
+
+        plt.savefig("/home/joe/Desktop/"+self.scene_name+"_fill.pdf")
         # plt.show()
 
     def draw_with_center_by_matplotlib(self):
@@ -660,7 +706,6 @@ class HDMap(object):
                     right_draw = True
                     lane_start_draw_dict[right_y] = True
 
-
             for index, center in draw_lane_obj.index_center_dict.items():
                 width = draw_lane_obj.index_width_dict[index]
                 way_type = draw_lane_obj.index_type_dict[index]
@@ -686,13 +731,21 @@ class HDMap(object):
 
 
 if __name__ == '__main__':
-    osm_file = "/home/joe/Dataset/Interaction/INTERACTION-Dataset-DR-single-v1_2/maps/DR_CHN_Merging_ZS0.osm"
-    hd_map = HDMap(osm_file_path=osm_file)
+    import os
+
+    path_list = os.listdir(path="/home/joe/Dataset/Interaction/INTERACTION-Dataset-DR-single-v1_2/maps/")
+
+    directory_path = "/home/joe/Dataset/Interaction/INTERACTION-Dataset-DR-single-v1_2/maps/"
+    for path in path_list:
+        if "_xy" not in path:
+            osm_file = directory_path+path
+            print(path)
+            hd_map = HDMap(osm_file_path=osm_file, name=path[:-4])
+            print("**************************************************")
+            print()
+
+    # osm_file = "/home/joe/Dataset/Interaction/INTERACTION-Dataset-DR-single-v1_2/maps/DR_CHN_Roundabout_LN.osm"
+    # hd_map = HDMap(osm_file_path=osm_file)
     # hd_map.draw_with_original_data_by_matplotlib()
     # hd_map.draw_with_center_by_matplotlib()
     # hd_map.get_draw_lane_info()
-    import json
-    for key, draw_lane_obj in hd_map.draw_lane_dict.items():
-        with open("/home/joe/Desktop/coord_"+str(key)+".json", "w", encoding="UTF-8") as f:
-            f.write(json.dumps(hd_map.draw_lane_dict[key].index_coord_dict))
-    print("Hello World!")
