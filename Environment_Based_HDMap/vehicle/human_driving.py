@@ -1,8 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from vehicle.control import ControlledVehicle
 import utils
-from vehicle.dynamics import Vehicle
 from vehicle.behavior import IDMVehicle
 from vehicle.control import MDPVehicle
 from vehicle.planner import planner
@@ -94,6 +91,7 @@ class InteractionVehicle(IDMVehicle):
         action["acceleration"] = np.clip(action["acceleration"], -self.ACC_MAX, self.ACC_MAX)
 
         # THIS NEED TO BE THOUGHT AGAIN
+        print("Lan Wenxing")
         self.check_collision()
 
         self.action = action
@@ -182,12 +180,12 @@ class HumanLikeVehicle(IDMVehicle):
     """
     Create a human-like (IRL) driving agent.
     """
-    TAU_A = 0.2  # [s]
+    TAU_A = 0.1  # [s]
     TAU_DS = 0.1  # [s]
     PURSUIT_TAU = 1.5 * TAU_DS  # [s]
     KP_A = 1 / TAU_A
     KP_HEADING = 1 / TAU_DS
-    KP_LATERAL = 1 / 0.2  # [1/s]
+    KP_LATERAL = 1 / 0.1  # [1/s]
     MAX_STEERING_ANGLE = np.pi / 3  # [rad]
     MAX_VELOCITY = 30  # [m/s]
 
@@ -236,16 +234,19 @@ class HumanLikeVehicle(IDMVehicle):
         """
         Plan a trajectory for the human-like (IRL) vehicle.
         """
-        s_d, s_d_d, s_d_d_d = self.position[0], self.velocity * np.cos(self.heading), self.acc  # Longitudinal
-        c_d, c_d_d, c_d_dd = self.position[1], self.velocity * np.sin(self.heading), 0  # Lateral
+        x, x_velocity, x_acc = self.position[0], self.velocity * np.cos(self.heading), self.acc * np.cos(self.heading) # Longitudinal
+        y, y_velocity, y_acc = self.position[1], self.velocity * np.sin(self.heading), self.acc * np.sin(self.heading)  # Lateral
         target_area, speed, T = target_point, target_speed, time_horizon
 
         if not self.human:
-            target_area += np.random.normal(0, 0.2)
+            target_area += np.random.normal(0, 0.1)
 
-        path = planner(s_d, s_d_d, s_d_d_d, c_d, c_d_d, c_d_dd, target_area, speed, T)
+        path = planner(x, x_velocity, x_acc, y, y_velocity, y_acc, target_area, speed, T)
 
         self.planned_trajectory = np.array([[x, y] for x, y in zip(path[0].x, path[0].y)])
+
+        # print(self.planned_trajectory)
+        # print()
 
         if self.IDM:
             self.planned_trajectory = None
@@ -260,6 +261,8 @@ class HumanLikeVehicle(IDMVehicle):
         if self.planned_trajectory is not None:
             self.action = {'steering': self.steering_control(self.planned_trajectory, step),
                            'acceleration': self.velocity_control(self.planned_trajectory, step)}
+
+            print(self.action)
         elif self.IDM:
             super(HumanLikeVehicle, self).act()
         else:
@@ -283,10 +286,11 @@ class HumanLikeVehicle(IDMVehicle):
 
         # Lateral velocity to heading
         heading_command = np.arcsin(np.clip(lateral_velocity_command / utils.not_zero(self.velocity), -1, 1))
-        heading_ref = np.clip(heading_command, -np.pi / 4, np.pi / 4)
-
+        heading_ref = np.clip(heading_command, -np.pi/4, np.pi/4)
         # Heading control
-        heading_rate_command = self.KP_HEADING * utils.wrap_to_pi(heading_ref - self.heading)
+        heading_rate_command = self.KP_HEADING*utils.wrap_to_pi(self.heading-heading_ref)
+
+        print("self.heading = {}, heading_command = {}".format(self.heading, heading_command))
 
         # Heading rate to steering angle
         steering_angle = np.arctan(self.LENGTH / utils.not_zero(self.velocity) * heading_rate_command)
@@ -303,7 +307,7 @@ class HumanLikeVehicle(IDMVehicle):
         :param trajectory: the trajectory to follow
         :return: an acceleration command [m/s2]
         """
-        target_velocity = (trajectory[step][0] - trajectory[step - 1][0]) / 0.1
+        target_velocity = np.linalg.norm((trajectory[step]-trajectory[step-1])/0.1)
         acceleration = self.KP_A * (target_velocity - self.velocity)
 
         return acceleration
@@ -324,5 +328,5 @@ class HumanLikeVehicle(IDMVehicle):
         ADE = np.mean([np.linalg.norm(original_traj[i] - ego_traj[i]) for i in
                        range(ego_traj.shape[0])])  # Average Displacement Error (ADE)
         FDE = np.linalg.norm(original_traj[-1] - ego_traj[-1])  # Final Displacement Error (FDE)
-
+        # print("FDE = {}".format(FDE))
         return FDE

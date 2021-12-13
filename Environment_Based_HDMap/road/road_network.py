@@ -292,5 +292,22 @@ class Road(object):
 
         return vehicles
 
+    @staticmethod
+    def get_y_coordinate(index_center_dict: dict, x: float):
+        center_x_list = []
+        center_y_list = []
+        for index, center_list in index_center_dict.items():
+            if index == 0:
+                center_x_list.append(center_list[0][0])
+                center_x_list.append(center_list[1][0])
+                center_y_list.append(center_list[0][1])
+                center_y_list.append(center_list[1][1])
+            else:
+                center_x_list.append(center_list[1][0])
+                center_y_list.append(center_list[1][1])
+
+        y = np.interp([x], center_x_list, center_y_list)
+
+        return x, y[0]
 
 

@@ -34,13 +34,43 @@ class HDMap(object):
 
         self.draw_lane_dict = self.complete_lane_to_draw_lane()
         self.fix_draw_lane()
+        self.sort_lane()
+
+    def sort_lane(self):
+        """
+        Get the left or right lane of the DrawLane object according to the start y coordinate.
+
+        If a lane has no right lane or left lane, the right_lane_id or right_lane_id will be None.
+        :return:
+        """
+        lane_info_dict = {}
+
+        for draw_lane_id, draw_lane_obj in self.draw_lane_dict.items():
+            coord_list = draw_lane_obj.index_coord_dict[0]
+
+            lane_info_dict[draw_lane_id] = coord_list[0][0][1]
+
+        lane_info_list = sorted(lane_info_dict.items(), key=lambda x: x[1])
+
+        for i, lane in enumerate(lane_info_list):
+            if i == 0:
+                self.draw_lane_dict[lane[0]].right_lane_id = lane_info_list[i+1][0]
+            elif i == len(lane_info_list)-1:
+                self.draw_lane_dict[lane[0]].left_lane_id = lane_info_list[i-1][0]
+            else:
+                self.draw_lane_dict[lane[0]].left_lane_id = lane_info_list[i-1][0]
+                self.draw_lane_dict[lane[0]].right_lane_id = lane_info_list[i+1][0]
 
     def fix_draw_lane(self):
+        """
+        Fix the lane.
+        :return:
+        """
         for _, draw_lane_obj in self.draw_lane_dict.items():
             for index in range(len(draw_lane_obj.index_coord_dict)-1):
                 for way in range(2):
                     for x in range(2):
-                        print(draw_lane_obj.index_coord_dict[index][way][1][x])
+                        # print(draw_lane_obj.index_coord_dict[index][way][1][x])
                         if abs(draw_lane_obj.index_coord_dict[index][way][1][x]-draw_lane_obj.index_coord_dict[index+1][way][0][x]) <= 0.0001:
                             continue
                         else:
@@ -49,7 +79,6 @@ class HDMap(object):
                                 draw_lane_obj.index_coord_dict[index][way][1] = (temp_value, draw_lane_obj.index_coord_dict[index][way][1][1])
                             else:
                                 draw_lane_obj.index_coord_dict[index][way][1] = (draw_lane_obj.index_coord_dict[index][way][1][0], temp_value)
-
 
     def get_node(self) -> dict:
         """
@@ -89,7 +118,7 @@ class HDMap(object):
             way = Way(w_id=int(ls.id), way_type=way_type, subtype=way_subtype, ref_node_list=ref_node_list)
             way_dict[int(ls.id)] = way
 
-        print(way_type_set)
+        # print(way_type_set)
 
         return way_dict
 

@@ -108,3 +108,7 @@ class DrawLane(object):
 
         # Dict: key = index, value = width (float object)
         self.index_width_dict = {}
+
+        self.left_lane_id = None
+        self.right_lane_id = None
+        self.right_lane_id = None

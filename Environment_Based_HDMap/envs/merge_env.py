@@ -1,3 +1,7 @@
+import sys
+
+import numpy as np
+
 from envs.common.abstract import AbstractEnv
 from Interaction_data.data_process import InteractionDataset
 from vehicle.human_driving import *
@@ -157,8 +161,8 @@ class MergeEnv(AbstractEnv):
             "observation": {"type": "Kinematics"},
             "vehicles_count": 10,
             "show_trajectories": True,
-            "screen_width": 1920,
-            "screen_height": 1080
+            "screen_width": 640,
+            "screen_height": 320
         })
         # print(cfg)
         return cfg
@@ -181,7 +185,7 @@ class MergeEnv(AbstractEnv):
         """
         net = RoadNetwork()
 
-        for _, draw_lane_obj in self.hd_map.draw_lane_dict.items():
+        for draw_lane_index, draw_lane_obj in self.hd_map.draw_lane_dict.items():
             for key, coord in draw_lane_obj.index_coord_dict.items():
                 left_way_list = coord[0]
                 right_way_list = coord[1]
@@ -191,7 +195,9 @@ class MergeEnv(AbstractEnv):
                 lane = Lane(left_way_list=left_way_list,
                             right_way_list=right_way_list,
                             left_way_type=way_type[0],
-                            right_way_type=way_type[1])
+                            right_way_type=way_type[1],
+                            draw_lane_id=draw_lane_index,
+                            index=key)
                 net.add_lane(draw_lane_obj.start_str, draw_lane_obj.end_str, lane)
 
         self.road = Road(network=net,
@@ -245,9 +251,12 @@ class MergeEnv(AbstractEnv):
         obs = self.observation.observe()
         terminal = self._is_terminal()
 
+        on_road_result = self.road.network.get_closest_lane_index(self.vehicle.position)
+
         info = {
             "velocity": self.vehicle.velocity,
             "crashed": self.vehicle.crashed,
+            "offroad": False if on_road_result is None else True,
             "action": action,
             "time": self.time
         }
@@ -259,11 +268,12 @@ class MergeEnv(AbstractEnv):
         Perform several steps of simulation with the planned trajectory
         """
         trajectory_features = []
-        T = action[2] if action is not None else 1
+        T = action[2] if action is not None else 3
 
         for i in range(int(T * self.SIMULATION_FREQUENCY) - 1):
             if i == 0:
                 if action is not None:  # sampled goal
+                    # lateral coordinate, speed, 1
                     self.vehicle.trajectory_planner(action[0], action[1], action[2])
                 else:  # human goal
                     self.vehicle.trajectory_planner(self.vehicle.interaction_traj[self.vehicle.sim_steps + T * 10][1],
@@ -274,6 +284,10 @@ class MergeEnv(AbstractEnv):
 
             self.road.act(self.run_step)
             self.road.step(1 / self.SIMULATION_FREQUENCY)
+            print("run_step = {}".format(self.run_step))
+            print(self.vehicle.position)
+            print(self.vehicle.planned_trajectory[self.run_step])
+            print()
             self.time += 1
             self.run_step += 1
             features = self._features()
@@ -291,6 +305,7 @@ class MergeEnv(AbstractEnv):
         interaction = np.max([feature[-2] for feature in trajectory_features])
         trajectory_features = np.sum(trajectory_features, axis=0)
         trajectory_features[-1] = human_likeness
+
 
         return trajectory_features
 
@@ -361,8 +376,9 @@ class MergeEnv(AbstractEnv):
         """
         The episode is over if the ego vehicle crashed or go off road or the time is out.
         """
-        return self.vehicle.crashed or self.time >= self.duration or self.vehicle.position[
-            0] >= 2150 / 3.281 or not self.vehicle.on_road
+        on_road_result = self.road.network.get_closest_lane_index(self.vehicle.position)
+
+        return self.vehicle.crashed or self.time >= self.duration or (on_road_result is None)
 
     def sampling_space(self):
         """
@@ -370,10 +386,22 @@ class MergeEnv(AbstractEnv):
         """
         lane_center = self.vehicle.lane.start[1]
         current_y = self.vehicle.position[1]
+        current_x = self.vehicle.position[0]
         current_speed = self.vehicle.velocity
-        lateral_offsets = np.array([lane_center - 12 / 3.281, current_y, lane_center + 12 / 3.281])
-        min_speed = current_speed - 2 if current_speed > 2 else 0
-        max_speed = current_speed + 2
-        target_speeds = np.linspace(min_speed, max_speed, 4)
 
-        return lateral_offsets, target_speeds
+        lane_offset_list = [current_y, lane_center]
+        draw_lane_obj = self.hd_map.draw_lane_dict[self.vehicle.lane.draw_lane_id]
+        if draw_lane_obj.left_lane_id is not None:
+            position = self.road.get_y_coordinate(
+                self.hd_map.draw_lane_dict[draw_lane_obj.left_lane_id].index_center_dict, current_x)
+            lane_offset_list.append(position[1])
+        if draw_lane_obj.right_lane_id is not None:
+            position = self.road.get_y_coordinate(
+                self.hd_map.draw_lane_dict[draw_lane_obj.right_lane_id].index_center_dict, current_x)
+            lane_offset_list.append(position[1])
+
+        min_speed = current_speed - 5 if current_speed > 5 else 0
+        max_speed = current_speed + 5
+        target_speeds = np.linspace(min_speed, max_speed, 10)
+
+        return np.array(lane_offset_list), target_speeds

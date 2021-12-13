@@ -6,24 +6,34 @@ import copy
 # QuinticPolynomial
 class QuinticPolynomial(object):
 
-    def __init__(self, xs, vxs, axs, xe, vxe, axe, T):
-        self.xs = xs
-        self.vxs = vxs
-        self.axs = axs
-        self.xe = xe
-        self.vxe = vxe
-        self.axe = axe
+    def __init__(self, ys, vys, ays, ye, vye, aye, T):
+        """
+        Initialization of the Quintic Polynomial.
+        :param ys: The y coordinate of the start state.
+        :param vys: The velocity in y coordinate of the start state.
+        :param ays: The acceleration in y coordinate of the start state.
+        :param ye: The y coordinate of the end state.
+        :param vye: The velocity in y coordinate of the end state.
+        :param aye: The acceleration in y coordinate of the end state.
+        :param T: The required time T to reach the target.
+        """
+        self.ys = ys
+        self.vys = vys
+        self.ays = ays
+        self.ye = ye
+        self.vye = vye
+        self.aye = aye
 
-        self.a0 = xs
-        self.a1 = vxs
-        self.a2 = axs / 2.0
+        self.a0 = ys
+        self.a1 = vys
+        self.a2 = ays / 2.0
 
         A = np.array([[T ** 3, T ** 4, T ** 5],
                       [3 * T ** 2, 4 * T ** 3, 5 * T ** 4],
                       [6 * T, 12 * T ** 2, 20 * T ** 3]])
-        b = np.array([xe - self.a0 - self.a1 * T - self.a2 * T ** 2,
-                      vxe - self.a1 - 2 * self.a2 * T,
-                      axe - 2 * self.a2])
+        b = np.array([ye - self.a0 - self.a1 * T - self.a2 * T ** 2,
+                      vye - self.a1 - 2 * self.a2 * T,
+                      aye - 2 * self.a2])
         x = np.linalg.solve(A, b)
 
         self.a3 = x[0]
@@ -119,7 +129,7 @@ class FrenetPath:
         self.c = []
 
 
-def calc_frenet_paths(s_d, s_d_d, s_d_d_d, c_d, c_d_d, c_d_dd, target_search_area, speed_search_area, T):
+def calc_frenet_paths(x, x_velocity, x_acc, y, y_velocity, y_acc, target_search_area, speed_search_area, T):
     frenet_paths = []
     DT = 0.1  # time tick [s]
 
@@ -128,7 +138,7 @@ def calc_frenet_paths(s_d, s_d_d, s_d_d_d, c_d, c_d_d, c_d_dd, target_search_are
     di = target_search_area
     fp = FrenetPath()
 
-    lat_qp = QuinticPolynomial(c_d, c_d_d, c_d_dd, di, 0.0, 0.0, T)  # lateral
+    lat_qp = QuinticPolynomial(y, y_velocity, y_acc, di, 0.0, 0.0, T)  # lateral
 
     fp.t = [t for t in np.arange(0.0, T, DT)]
     fp.d = [lat_qp.calc_point(t) for t in fp.t]
@@ -138,7 +148,7 @@ def calc_frenet_paths(s_d, s_d_d, s_d_d_d, c_d, c_d_d, c_d_dd, target_search_are
 
     tv = speed_search_area
     tfp = copy.deepcopy(fp)
-    lon_qp = QuarticPolynomial(s_d, s_d_d, s_d_d_d, tv, 0.0, T)  # longitudinal
+    lon_qp = QuarticPolynomial(x, x_velocity, x_acc, tv, 0.0, T)  # longitudinal
 
     tfp.s = [lon_qp.calc_point(t) for t in fp.t]
     tfp.s_d = [lon_qp.calc_first_derivative(t) for t in fp.t]
@@ -161,8 +171,8 @@ def calc_global_paths(fplist):
     return fplist
 
 
-def planner(s_d, s_d_d, s_d_d_d, c_d, c_d_d, c_d_dd, target_search_area, speed_search_area, T):
-    fplist = calc_frenet_paths(s_d, s_d_d, s_d_d_d, c_d, c_d_d, c_d_dd, target_search_area, speed_search_area, T)
+def planner(x, x_velocity, x_acc, y, y_velocity, y_acc, target_search_area, speed_search_area, T):
+    fplist = calc_frenet_paths(x, x_velocity, x_acc, y, y_velocity, y_acc, target_search_area, speed_search_area, T)
     fplist = calc_global_paths(fplist)
 
     return fplist

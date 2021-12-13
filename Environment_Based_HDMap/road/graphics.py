@@ -220,7 +220,9 @@ if __name__ == '__main__':
             lane = Lane(left_way_list=left_way_list,
                         right_way_list=right_way_list,
                         left_way_type=way_type[0],
-                        right_way_type=way_type[1])
+                        right_way_type=way_type[1],
+                        draw_lane_id=0,
+                        index=0)
             road_network.add_lane(draw_lane_obj.start_str, draw_lane_obj.end_str, lane)
 
     road = Road(network=road_network)

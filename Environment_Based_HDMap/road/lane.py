@@ -6,7 +6,7 @@ class Lane(object):
     A lane on the road, described by its four corner coordinates.
     """
     def __init__(self, left_way_list: list, right_way_list: list, left_way_type: str, right_way_type: str,
-                 speed_limit=20):
+                 draw_lane_id: int, index: int, speed_limit=20):
         self.left_way_list = left_way_list
         self.right_way_list = right_way_list
         self.left_way_type = left_way_type
@@ -18,6 +18,9 @@ class Lane(object):
         self.heading = None
         self.length = self.get_lane_length()
         self.speed_limit = speed_limit
+
+        self.draw_lane_id = draw_lane_id
+        self.lane_index = index
 
     def get_lane_length(self):
         """
