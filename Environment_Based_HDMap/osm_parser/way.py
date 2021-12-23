@@ -22,3 +22,7 @@ class Way(object):
 
     def __repr__(self):
         return self.__str__()
+
+    def to_json(self):
+        return {"id": self.id, "way_type": self.type, "subtype": self.subtype, "ref_node_list": self.ref_node_list,
+                "lane_list": self.lane_list}

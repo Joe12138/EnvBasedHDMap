@@ -17,6 +17,9 @@ class Lane(object):
     def __repr__(self):
         return self.__str__()
 
+    def to_json(self):
+        return {"id": self.id, "left_way_id": self.left_way_id, "right_way_id": self.right_way_id}
+
 
 class CompleteLane(object):
     """
@@ -112,3 +115,9 @@ class DrawLane(object):
         self.left_lane_id = None
         self.right_lane_id = None
         self.right_lane_id = None
+
+    def to_json(self):
+        return {"start_str": self.start_str, "end_str": self.end_str, "id": self.id,
+                "index_coord_dict": self.index_coord_dict, "index_type_dict": self.index_type_dict}
+
+

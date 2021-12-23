@@ -24,3 +24,6 @@ class Node(object):
     def __repr__(self):
         return self.__str__()
 
+    def to_json(self):
+        return {"id": self.id, "x": self.x, "y": self.y, "way_list": self.way_list}
+

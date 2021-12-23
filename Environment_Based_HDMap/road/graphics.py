@@ -187,7 +187,7 @@ class RoadGraphics(object):
 
 
 if __name__ == '__main__':
-    file_name = "DR_CHN_Merging_ZS0"
+    file_name = "DR_USA_Intersection_EP0"
     osm_file_path = "/home/joe/Prediction/Dataset/interaction-dataset/maps/" + file_name + ".osm"
 
     file_path = "/home/joe/Dataset/Interaction/INTERACTION-Dataset-DR-single-v1_2/train/" + file_name + "_train.csv"
